@@ -14,7 +14,7 @@ using namespace std;
 #define MAX_TRI_SIZE (0.8)
 #define LIFE_TIME (60)
 
-Pool<Triparticle*> pool;
+Pool<Triparticle> pool;
 
 const vertex MIN_START{
 	-3.0,
