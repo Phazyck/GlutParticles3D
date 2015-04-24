@@ -1,10 +1,8 @@
 #include <vector>
-#include <iostream>
 #include <cstdlib>
-#include <fstream>
-#include <limits>
-#include <string>
 #include <GL/glut.h>
+#include "particles.h"
+#include "pool.h"
 
 using namespace std;
 
@@ -14,17 +12,9 @@ using namespace std;
 #define EMIT_AMOUNT (5)
 #define MIN_TRI_SIZE (0.3)
 #define MAX_TRI_SIZE (0.8)
+#define LIFE_TIME (60)
 
-struct vertex {
-	double x;
-	double y;
-	double z;
-};
-struct triangle {
-	int i1;
-	int i2;
-	int i3;
-};
+Pool<Triparticle*> pool;
 
 const vertex MIN_START{
 	-3.0,
@@ -37,18 +27,6 @@ const vertex MAX_START{
 	2.0,
 	0.0
 };
-
-// Performance posibility: Have vertices in world space instead of local,
-// and disregard position entirely when drawing, saving calculations.
-class Triparticle {
-public:
-	vertex pos;
-	vertex v1, v2, v3;
-	// Maybe have rotation and angular velocity?  
-	vertex velocity;
-};
-
-vector<Triparticle*> triparticles;
 
 double randFloatRange(double M, double N)
 {
@@ -77,12 +55,11 @@ vertex make_random_vertex(double xMin, double xMax,
 }
 
 
-Triparticle* make_random_triparticle(double minSize,
+void init_random_triparticle(Triparticle *t, 
+	double minSize,
 	double maxSize,
 	vertex minPos,
 	vertex maxPos) {
-
-	Triparticle* t = new Triparticle();
 
 	// Random position between min and max
 	t->pos = make_random_vertex(
@@ -102,15 +79,18 @@ Triparticle* make_random_triparticle(double minSize,
 		0.0
 	};
 
-	return t;
+	t->lifetime = LIFE_TIME;
+
 }
 
-void move_triparticle(Triparticle* t) {
+void update_triparticle(Triparticle* t) {
 	vertex newPos = t->pos;
 
 	newPos.x += t->velocity.x;
 	newPos.y += t->velocity.y;
 	newPos.z += t->velocity.z;
+
+	t->lifetime--;
 
 	t->pos = newPos;
 }
@@ -171,17 +151,28 @@ void onFrame(int value) {
 	count++;
 	if (count % EMIT_FRAME_DELAY == 0) {
 		for (int i = 0; i < EMIT_AMOUNT; i++) {
-			Triparticle* t = make_random_triparticle(MIN_TRI_SIZE, MAX_TRI_SIZE, MIN_START, MAX_START);
-			triparticles.push_back(t);
+
+			Triparticle* t = pool.new_object();
+
+			init_random_triparticle(t, MIN_TRI_SIZE, MAX_TRI_SIZE, MIN_START, MAX_START);
+
 		}
 	}
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	for (int i = 0; i < triparticles.size(); ++i) {
-		Triparticle* t = triparticles.at(i);
+	for (int i = 0; i < pool.count(); ++i) {
+		Triparticle* t = pool.at(i);
 
-		move_triparticle(t);
+		update_triparticle(t);
+
+		if (t->lifetime < 0)
+		{
+			pool.mark_dead(i--);
+			continue;
+		}
+
+
 		draw_triparticle(t);
 	}
 
